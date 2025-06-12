@@ -2,7 +2,9 @@ name: Workflow B
 
 on:
   workflow_run:
-    workflows: ["Workflow A"]    # must match the `name:` of A
+    #workflows: ["Workflow A"]    # must match the `name:` of A
+    #workflow: ["secrets."]
+    workflows: ["${{ vars.WORKFLOW_NAME }}"]
     types: 
       - completed                 # or "requested", "in_progress", etc.
 
