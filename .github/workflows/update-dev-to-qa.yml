@@ -37,8 +37,11 @@ jobs:
       # 3) Copy (or modify) the file
       - name: Copy updated file from dev → qa
         run: |
-          cp source/${{ github.event.inputs.file_path }} \
-             target/${{ github.event.inputs.file_path }}
+          # e.g. prepend a build date
+          sed -i "1s/^/Built on $(date +'%Y-%m-%d')\n/" source/${{ github.event.inputs.file_path }}
+          cp source/${{ github.event.inputs.file_path }} target/${{ github.event.inputs.file_path }}
+          #cp source/${{ github.event.inputs.file_path }} \
+            # target/${{ github.event.inputs.file_path }}
 
       # 4) Commit & push on qa
       - name: Commit & push changes to qa
