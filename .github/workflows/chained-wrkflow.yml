@@ -1,0 +1,17 @@
+name: Workflow B
+
+on:
+  workflow_run:
+    workflows: ["Workflow A"]    # must match the `name:` of A
+    types: 
+      - completed                 # or "requested", "in_progress", etc.
+
+jobs:
+  followup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Next work
+        run: echo "🚀 Running B now that A has finished"
