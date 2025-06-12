@@ -10,7 +10,7 @@ on:
         description: 'Filename of the notebook to deploy'
         required: true
         type: choice
-        options: 
+        options:
           - 'all'
           - 'sample-1.ipynb'
           - 'sample-2.ipynb'
@@ -18,7 +18,7 @@ on:
         default: 'sample-1.ipynb'
 
 permissions:
-  contents: write       # required for pushing back to QA or deploying
+  contents: write   # needed for upload/download-artifact v4
 
 jobs:
   build:
@@ -34,7 +34,7 @@ jobs:
           cp -R Notebook/* build/
 
       - name: Upload Notebook Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: notebook-artifact
           path: build/
@@ -48,24 +48,13 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download Notebook Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: notebook-artifact
 
       - name: Debug Input
         run: |
           echo "Notebook filename: ${{ github.event.inputs.notebook_filename }}"
-
-      - name: Set Notebook Path
-        id: set-path
-        run: |
-          NOTEBOOK_FILENAME="${{ github.event.inputs.notebook_filename }}"
-          if [ "$NOTEBOOK_FILENAME" = "all" ]; then
-            NOTEBOOK_PATH="Notebook/"
-          else
-            NOTEBOOK_PATH="Notebook/$NOTEBOOK_FILENAME"
-          fi
-          echo "NOTEBOOK_PATH=$NOTEBOOK_PATH" >> $GITHUB_ENV
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -89,19 +78,20 @@ jobs:
           token = $DATABRICKS_TOKEN
           EOF
 
-      - name: Deploy Notebook to Databricks
+      - name: Deploy Notebooks to Databricks
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
           DATABRICKS_WORKSPACE_DIR: '/Workspace/KrgProject'
         run: |
-          if [ "${{ github.event.inputs.notebook_filename }}" = "all" ]; then
-            for nb in Notebook/*.ipynb; do
+          FILE="${{ github.event.inputs.notebook_filename }}"
+          if [ "$FILE" = "all" ]; then
+            for nb in build/*.ipynb; do
               echo "Deploying $nb"
               databricks workspace import --overwrite "$nb" "$DATABRICKS_WORKSPACE_DIR/$(basename "$nb")" -l PYTHON
             done
           else
-            nb="Notebook/${{ github.event.inputs.notebook_filename }}"
+            nb="build/$FILE"
             echo "Deploying $nb"
             databricks workspace import --overwrite "$nb" "$DATABRICKS_WORKSPACE_DIR/$(basename "$nb")" -l PYTHON
           fi
