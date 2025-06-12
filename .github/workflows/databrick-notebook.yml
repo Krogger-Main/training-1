@@ -1,0 +1,127 @@
+name: Build and Deploy Notebook Selective
+
+on:
+  push:
+    paths:
+      - 'Notebook/**'
+  workflow_dispatch:
+    inputs:
+      notebook_filename:
+        description: 'Filename of the notebook to deploy'
+        required: true
+        type: choice
+        options: 
+          - 'all'
+          - 'sample-1.ipynb'
+          - 'sample-2.ipynb'
+          - 'sample-3.ipynb'
+        default: 'sample-1.ipynb'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Package Notebook
+      run: |
+        mkdir -p build
+        cp -R Notebook/* build/
+
+    - name: Upload Notebook Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: notebook-artifact
+        path: build/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Download Notebook Artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: notebook-artifact
+
+    - name: Debug Input
+      run: |
+        echo "Notebook filename: ${{ github.event.inputs.notebook_filename }}"
+        echo "Environment variable: $NOTEBOOK_FILENAME"
+        
+    - name: Set Notebook Path
+      id: set-path
+      run: |
+        NOTEBOOK_FILENAME="${{ github.event.inputs.notebook_filename }}"
+        echo "Received Notebook Filename: $NOTEBOOK_FILENAME"
+        if [ -z "$NOTEBOOK_FILENAME" ]; then
+          echo "Error: NOTEBOOK_FILENAME is empty."
+          exit 1
+        fi
+        if [ "$NOTEBOOK_FILENAME" = "all" ]; then
+          NOTEBOOK_PATH="/home/runner/work/Krogger/Krogger/Notebook/"
+        else
+          NOTEBOOK_PATH="/home/runner/work/Krogger/Krogger/Notebook/$NOTEBOOK_FILENAME"
+        fi
+        echo "NOTEBOOK_PATH=$NOTEBOOK_PATH" >> $GITHUB_ENV
+        echo "NOTEBOOK_PATH is set to: $NOTEBOOK_PATH"
+        ls -R /home/runner/work/Krogger/Krogger/Notebook/
+        ls -R $NOTEBOOK_PATH
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install Databricks CLI
+      run: |
+        python -m pip install --upgrade pip
+        pip install databricks-cli
+
+    - name: Configure Databricks CLI
+      env:
+        DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+        DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      run: |
+        mkdir -p ~/.databricks
+        echo "[DEFAULT]" > ~/.databricks/config
+        echo "host = $DATABRICKS_HOST" >> ~/.databricks/config
+        echo "token = $DATABRICKS_TOKEN" >> ~/.databricks/config
+
+    - name: Deploy Notebook to Databricks
+      env:
+        DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+        DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        DATABRICKS_WORKSPACE_DIR: '/Workspace/KrgProject'
+      run: |
+        NOTEBOOK_FILENAME="${{ github.event.inputs.notebook_filename }}"
+        echo "file check $NOTEBOOK_FILENAME"
+        if [ "$NOTEBOOK_FILENAME" = "all" ]; then
+          echo "Listing contents of $NOTEBOOK_PATH:"
+          ls -al /home/runner/work/Krogger/Krogger/Notebook/
+          
+          notebooks=$(find /home/runner/work/Krogger/Krogger/Notebook/ -name "*.ipynb")
+          if [ -z "$notebooks" ]; then
+            echo "No notebooks found to deploy."
+            exit 1
+          fi
+          
+          for notebook in $notebooks; do
+            echo "Deploying $notebook"
+            databricks workspace import --overwrite "$notebook" "$DATABRICKS_WORKSPACE_DIR/$(basename "$notebook")" -l PYTHON
+          done
+        else
+          NOTEBOOK_PATH="/home/runner/work/Krogger/Krogger/Notebook/$NOTEBOOK_FILENAME"
+          echo "Deploying $NOTEBOOK_PATH"
+          if [ -f "$NOTEBOOK_PATH" ]; then
+            databricks workspace import --overwrite "$NOTEBOOK_PATH" "$DATABRICKS_WORKSPACE_DIR/$(basename "$NOTEBOOK_PATH")" -l PYTHON
+          else
+            echo "Notebook $NOTEBOOK_PATH not found."
+            exit 1
+          fi
+        fi
