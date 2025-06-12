@@ -39,6 +39,7 @@ jobs:
         run: |
           # e.g. prepend a build date
           sed -i "1s/^/Built on $(date +'%Y-%m-%d')\n/" source/${{ github.event.inputs.file_path }}
+          sed -i 's/Testing file/Deploying file/g' source/${{ github.event.inputs.file_path }}
           cp source/${{ github.event.inputs.file_path }} target/${{ github.event.inputs.file_path }}
           #cp source/${{ github.event.inputs.file_path }} \
             # target/${{ github.event.inputs.file_path }}
