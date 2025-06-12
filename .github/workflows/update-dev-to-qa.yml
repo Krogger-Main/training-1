@@ -1,0 +1,52 @@
+name: Sync Text File Dev→QA
+
+# Trigger manually or on push to dev
+on:
+  workflow_dispatch:
+    inputs:
+      file_path:
+        description: 'Path to the text file (relative to repo root)'
+        required: true
+        default: 'notes.txt'
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write       # allow pushing back to QA
+
+jobs:
+  sync-file:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Check out dev into 'source'
+      - name: Checkout dev branch
+        uses: actions/checkout@v3
+        with:
+          ref: dev
+          path: source
+
+      # 2) Check out qa into 'target'
+      - name: Checkout qa branch
+        uses: actions/checkout@v3
+        with:
+          ref: qa
+          path: target
+
+      # 3) Copy (or modify) the file
+      - name: Copy updated file from dev → qa
+        run: |
+          cp source/${{ github.event.inputs.file_path }} \
+             target/${{ github.event.inputs.file_path }}
+
+      # 4) Commit & push on qa
+      - name: Commit & push changes to qa
+        working-directory: target
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ github.event.inputs.file_path }}"
+          git diff --staged --quiet || \
+            (git commit -m "Sync ${{ github.event.inputs.file_path }} from dev" && \
+             git push origin qa)
