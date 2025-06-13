@@ -1,9 +1,9 @@
 name: Build and Deploy Notebook Selective
 
 on:
-  push:
-    paths:
-      - 'Notebook/**'
+  #push:
+   # paths:
+    #  - 'Notebook/**'
   workflow_dispatch:
     inputs:
       notebook_filename:
