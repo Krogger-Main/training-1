@@ -17,7 +17,7 @@ on:
         default: 'sample-1.ipynb'
 
 permissions:
-  contents: write   # needed for upload/download-artifact v4
+  contents: write
 
 jobs:
   build:
@@ -30,13 +30,16 @@ jobs:
       - name: Package Notebook
         run: |
           mkdir -p build
-          cp -R Notebook/* build/
+          cp Notebook/*.ipynb build/
+          echo "✅ Notebooks copied to build/"
+          ls -lh build/
 
       - name: Upload Notebook Artifact
         uses: actions/upload-artifact@v4
         with:
           name: notebook-artifact
           path: build/
+          retention-days: 1
 
   deploy:
     needs: build
@@ -50,10 +53,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: notebook-artifact
+          path: build
 
-      - name: Debug Input
+      - name: Debug Input & List Files
         run: |
-          echo "Notebook filename: ${{ github.event.inputs.notebook_filename }}"
+          echo "📄 Notebook filename: ${{ github.event.inputs.notebook_filename }}"
+          echo "📁 Contents of build directory:"
+          ls -lh build/
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -82,16 +88,23 @@ jobs:
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-          DATABRICKS_WORKSPACE_DIR: '/Workspace/KrgProject'
+          #DATABRICKS_WORKSPACE_DIR: '/Users/2019bec033@sggs.ac.in/qa-deploy'  # <-- Update as needed
+          DATABRICKS_WORKSPACE_DIR: ${{ secrets.DATABRICKS_WORKSPACE_DIR }}
         run: |
           FILE="${{ github.event.inputs.notebook_filename }}"
+          databricks workspace mkdirs "$DATABRICKS_WORKSPACE_DIR"
           if [ "$FILE" = "all" ]; then
             for nb in build/*.ipynb; do
-              echo "Deploying $nb"
+              echo "🚀 Deploying $nb"
               databricks workspace import --overwrite "$nb" "$DATABRICKS_WORKSPACE_DIR/$(basename "$nb")" -l PYTHON
             done
           else
             nb="build/$FILE"
-            echo "Deploying $nb"
-            databricks workspace import --overwrite "$nb" "$DATABRICKS_WORKSPACE_DIR/$(basename "$nb")" -l PYTHON
+            if [ -f "$nb" ]; then
+              echo "🚀 Deploying $nb"
+              databricks workspace import --overwrite "$nb" "$DATABRICKS_WORKSPACE_DIR/$(basename "$nb")" -l PYTHON
+            else
+              echo "❌ File not found: $nb"
+              exit 1
+            fi
           fi
