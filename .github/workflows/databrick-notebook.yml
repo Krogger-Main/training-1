@@ -69,6 +69,7 @@ jobs:
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DATABRICKS_WORKSPACE_DIR: ${{ secrets.DATABRICKS_WORKSPACE_DIR }}
         run: |
           mkdir -p ~/.databricks
           cat <<EOF > ~/.databricks/config
