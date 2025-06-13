@@ -87,7 +87,8 @@ jobs:
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-          DATABRICKS_WORKSPACE_DIR: '/Users/2019bec033@sggs.ac.in/qa-deploy'  # <-- Update as needed
+          #DATABRICKS_WORKSPACE_DIR: '/Users/2019bec033@sggs.ac.in/qa-deploy'  # <-- Update as needed
+          DATABRICKS_WORKSPACE_DIR: ${{ secrets.DATABRICKS_WORKSPACE_DIR }}
         run: |
           FILE="${{ github.event.inputs.notebook_filename }}"
           databricks workspace mkdirs "$DATABRICKS_WORKSPACE_DIR"
