@@ -14,7 +14,6 @@ on:
           - 'all'
           - 'sample-1.ipynb'
           - 'sample-2.ipynb'
-          - 'sample-3.ipynb'
         default: 'sample-1.ipynb'
 
 permissions:
