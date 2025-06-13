@@ -1,0 +1,111 @@
+name: Build and Deploy Notebook Selective-1(Varscall)
+
+on:
+  # Uncomment to trigger on push to Notebook folder
+  # push:
+  #   paths:
+  #     - 'Notebook/**'
+
+  workflow_dispatch:
+    inputs:
+      notebook_filename:
+        description: 'Filename of the notebook to deploy'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'sample-1.ipynb'
+          - 'sample-2.ipynb'
+        default: 'sample-1.ipynb'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Package Notebook
+        run: |
+          mkdir -p build
+          cp Notebook/*.ipynb build/
+          echo "✅ Notebooks copied to build/"
+          ls -lh build/
+
+      - name: Upload Notebook Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notebook-artifact
+          path: build/
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: QA-ENV  # ✅ This enables use of environment variables from QA-ENV
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Download Notebook Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: notebook-artifact
+          path: build
+
+      - name: Debug Input & List Files
+        run: |
+          echo "📄 Notebook filename: ${{ github.event.inputs.notebook_filename }}"
+          echo "📁 Contents of build directory:"
+          ls -lh build/
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install Databricks CLI
+        run: |
+          pip install --upgrade pip
+          pip install databricks-cli
+
+      - name: Configure Databricks CLI
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ vars.DATABRICKS_TOKEN }}
+        run: |
+          mkdir -p ~/.databricks
+          cat <<EOF > ~/.databricks/config
+          [DEFAULT]
+          host = $DATABRICKS_HOST
+          token = $DATABRICKS_TOKEN
+          EOF
+
+      - name: Deploy Notebooks to Databricks
+        env:
+          DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ vars.DATABRICKS_TOKEN }}
+          DATABRICKS_WORKSPACE_DIR: ${{ vars.DATABRICKS_WORKSPACE_DIR }}
+        run: |
+          FILE="${{ github.event.inputs.notebook_filename }}"
+          databricks workspace mkdirs "$DATABRICKS_WORKSPACE_DIR"
+          if [ "$FILE" = "all" ]; then
+            for nb in build/*.ipynb; do
+              echo "🚀 Deploying $nb"
+              databricks workspace import --overwrite "$nb" "$DATABRICKS_WORKSPACE_DIR/$(basename "$nb")" -l PYTHON
+            done
+          else
+            nb="build/$FILE"
+            if [ -f "$nb" ]; then
+              echo "🚀 Deploying $nb"
+              databricks workspace import --overwrite "$nb" "$DATABRICKS_WORKSPACE_DIR/$(basename "$nb")" -l PYTHON
+            else
+              echo "❌ File not found: $nb"
+              exit 1
+            fi
+          fi
